@@ -8,10 +8,10 @@
     />
     <meta name="theme-color" content="#f6f7f8" />
     <title>一人食 · 食材保鲜记录</title>
-    <link rel="stylesheet" href="style.css?v=20261026-1" />
+    <link rel="stylesheet" href="style.css?v=20261026-2" />
     <script defer src="icons.js?v=20261026-1"></script>
-    <script defer src="core.js?v=20261026-1"></script>
-    <script defer src="app.js?v=20261026-1"></script>
+    <script defer src="core.js?v=20261026-2"></script>
+    <script defer src="app.js?v=20261026-2"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -267,6 +267,12 @@
         <fieldset class="expiry-fields">
           <legend><i data-lucide="calendar-days"></i>保鲜日期</legend>
           <div class="form-fields">
+            <label class="full-width"
+              >商品保质期<input
+                name="shelfLife"
+                maxlength="120"
+                placeholder="例如：12个月 / 4天，以包装或商家说明为准"
+            /></label>
             <label>包装到期日<input name="expiryDate" type="date" /></label>
             <label>开封日期<input name="openedDate" type="date" /></label>
             <label
@@ -280,7 +286,7 @@
             >
           </div>
           <p>
-            以两个截止日中较早的日期倒计时，日期当天显示“今天截止”。日期不确定可留空。
+            保质期是商品的保存期限，不是从购买当天起的剩余时间。以两个截止日中较早的日期倒计时，日期当天显示“今天截止”。
           </p>
           <output
             id="deadline-preview"

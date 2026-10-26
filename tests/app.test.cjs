@@ -237,14 +237,25 @@ test("import merges only valid backups and preserves data on malformed files", a
   const incoming = P.seedItems()[0];
   incoming.id = "backup-extra";
   incoming.name = "备份食材";
-  Object.defineProperty(input, "files", { configurable: true, value: [{ size: 1000, text: async () => JSON.stringify({ version: 1, items: [incoming] }) }] });
+  Object.defineProperty(input, "files", {
+    configurable: true,
+    value: [
+      {
+        size: 1000,
+        text: async () => JSON.stringify({ version: 1, items: [incoming] }),
+      },
+    ],
+  });
   input.dispatchEvent(new a.w.Event("change"));
   await new Promise(setImmediate);
   assert.equal(a.$("#confirm-dialog").open, true);
   a.$("#confirm-dialog").close("confirm");
   await new Promise(setImmediate);
   assert.equal(a.saved().items.length, 12);
-  Object.defineProperty(input, "files", { configurable: true, value: [{ size: 100, text: async () => "broken backup" }] });
+  Object.defineProperty(input, "files", {
+    configurable: true,
+    value: [{ size: 100, text: async () => "broken backup" }],
+  });
   input.dispatchEvent(new a.w.Event("change"));
   await new Promise(setImmediate);
   assert.equal(a.saved().items.length, 12);
@@ -254,22 +265,71 @@ test("import merges only valid backups and preserves data on malformed files", a
 test("export includes all persisted records and corrupted original data is recoverable", async (t) => {
   for (const original of [undefined, "broken original"]) {
     const a = setup(t, original);
-    let blob; let fileName;
-    a.w.URL.createObjectURL = value => { blob = value; return "blob:test"; };
-    a.w.HTMLAnchorElement.prototype.click = function () { fileName = this.download; };
+    let blob;
+    let fileName;
+    a.w.URL.createObjectURL = (value) => {
+      blob = value;
+      return "blob:test";
+    };
+    a.w.HTMLAnchorElement.prototype.click = function () {
+      fileName = this.download;
+    };
     a.click("#export-button");
     const reader = new a.w.FileReader();
-    const text = await new Promise(resolve => { reader.onload = () => resolve(reader.result); reader.readAsText(blob); });
-    if (original) { assert.equal(text, original); assert.match(fileName, /原始数据/); }
-    else assert.equal(JSON.parse(text).items.length, 11);
+    const text = await new Promise((resolve) => {
+      reader.onload = () => resolve(reader.result);
+      reader.readAsText(blob);
+    });
+    if (original) {
+      assert.equal(text, original);
+      assert.match(fileName, /原始数据/);
+    } else assert.equal(JSON.parse(text).items.length, 11);
   }
 });
 
 test("clearing storage from another tab blocks writing instead of silently recreating it", (t) => {
   const a = setup(t);
   a.w.localStorage.clear();
-  a.w.dispatchEvent(new a.w.StorageEvent("storage", { key: null, newValue: null }));
-  a.click("#add-button"); a.fill("name", "新食材"); a.submit();
+  a.w.dispatchEvent(
+    new a.w.StorageEvent("storage", { key: null, newValue: null }),
+  );
+  a.click("#add-button");
+  a.fill("name", "新食材");
+  a.submit();
   assert.equal(a.w.localStorage.getItem(P.STORAGE_KEY), null);
   assert.equal(a.$("#storage-error").hidden, false);
+});
+
+test("existing browser records persist screenshot shelf lives without overwriting dates or quantities", (t) => {
+  const old = P.seedItems().map(
+    ({ shelfLife, productDetailsRevision, ...item }) => item,
+  );
+  old[0].remaining = "一半";
+  old[0].expiryDate = "2026-11-15";
+  const a = setup(t, JSON.stringify({ version: 1, items: old }));
+  assert.equal(a.saved().items[0].shelfLife, "12个月");
+  assert.equal(a.saved().items[0].remaining, "一半");
+  assert.equal(a.saved().items[0].expiryDate, "2026-11-15");
+  assert.equal(a.saved().items.length, 11);
+  a.click('[aria-label="编辑 顺德鱼皮角"]');
+  assert.equal(a.$('[name="shelfLife"]').value, "12个月");
+  a.fill("shelfLife", "以实物包装为准");
+  a.submit();
+  const reload = setup(t, JSON.stringify(a.saved()));
+  assert.equal(reload.saved().items[0].shelfLife, "以实物包装为准");
+});
+
+test("shelf life alone never becomes a countdown and is escaped as plain text", (t) => {
+  const a = setup(t);
+  a.click('[aria-label="编辑 去皮五花肉片"]');
+  assert.match(a.$("#deadline-preview").textContent, /保质期 4天/);
+  a.fill("shelfLife", '<img src=x onerror="alert(1)">');
+  a.submit();
+  assert.equal(a.$("#food-list img"), null);
+  assert.equal(a.$("#stat-soon").textContent, "0项");
+  assert.equal(a.$("#stat-expired").textContent, "0项");
+  assert.equal(
+    a.saved().items.find((item) => item.name === "去皮五花肉片").expiryDate,
+    "",
+  );
 });

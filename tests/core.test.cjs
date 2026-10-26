@@ -133,3 +133,47 @@ test("merge preserves other purchases and only accepts newer revisions", () => {
   const extra = item({ id: "extra" });
   assert.deepEqual(P.mergeItems([existing], [newer, extra]), [newer, extra]);
 });
+
+test("screenshot shelf lives match all six products without inventing expiry dates", () => {
+  const items = P.seedItems();
+  assert.deepEqual(
+    items
+      .filter((item) => item.shelfLife)
+      .map((item) => [item.name, item.shelfLife]),
+    [
+      ["顺德鱼皮角", "12个月"],
+      ["玉米猪肉蒸饺", "12个月"],
+      ["鲜虾荠菜猪肉水饺", "12个月"],
+      ["亚麻籽冷鲜猪肉丸子", "5天"],
+      ["去皮五花肉片", "4天"],
+      ["冷鲜猪瘦肉丝", "4天"],
+    ],
+  );
+  assert.ok(items.every((item) => !item.expiryDate && !item.purchaseDate));
+});
+
+test("legacy records gain shelf life once while preserving personal changes", () => {
+  const legacy = P.seedItems().map(
+    ({ shelfLife, productDetailsRevision, ...item }) => item,
+  );
+  legacy[0].notes = "已分装";
+  legacy[0].expiryDate = "2026-11-15";
+  legacy[0].remaining = "一半";
+  const enriched = P.parseBackup({ version: 1, items: legacy }).items;
+  assert.equal(enriched[0].shelfLife, "12个月");
+  assert.equal(enriched[0].notes, "已分装");
+  assert.equal(enriched[0].expiryDate, "2026-11-15");
+  assert.equal(enriched[0].remaining, "一半");
+  assert.equal(enriched[0].updatedAt, legacy[0].updatedAt);
+  enriched[0].shelfLife = "";
+  assert.equal(
+    P.parseBackup({ version: 1, items: enriched }).items[0].shelfLife,
+    "",
+  );
+  const unrelated = { ...legacy[0], id: "another-purchase" };
+  assert.equal(
+    P.parseBackup({ version: 1, items: [unrelated] }).items[0].shelfLife,
+    "",
+  );
+  assert.deepEqual(P.parseBackup({ version: 1, items: [] }).items, []);
+});

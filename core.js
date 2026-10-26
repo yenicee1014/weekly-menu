@@ -18,6 +18,15 @@
     other: "package",
   };
   const statusNames = { active: "在库", eaten: "已吃完", discarded: "已丢弃" };
+  const PRODUCT_DETAILS_REVISION = "product-screenshots-20261026";
+  const productShelfLives = {
+    顺德鱼皮角: "12个月",
+    玉米猪肉蒸饺: "12个月",
+    鲜虾荠菜猪肉水饺: "12个月",
+    亚麻籽冷鲜猪肉丸子: "5天",
+    去皮五花肉片: "4天",
+    冷鲜猪瘦肉丝: "4天",
+  };
   const seedData = [
     ["顺德鱼皮角", "180g × 1", 14.32, "prepared", ""],
     ["玉米猪肉蒸饺", "264g，12只 × 1", 7.12, "prepared", ""],
@@ -113,6 +122,10 @@
       expiryDate: "",
       openedDate: "",
       useByDate: "",
+      shelfLife: productShelfLives[name] || "",
+      productDetailsRevision: productShelfLives[name]
+        ? PRODUCT_DETAILS_REVISION
+        : "",
       dateBasis: "label",
       shop: "",
       status: "active",
@@ -136,6 +149,8 @@
       "expiryDate",
       "openedDate",
       "useByDate",
+      "shelfLife",
+      "productDetailsRevision",
       "dateBasis",
       "shop",
       "notes",
@@ -226,7 +241,25 @@
     const items = data.items.map(validateItem);
     if (new Set(items.map((item) => item.id)).size !== items.length)
       throw new Error("备份中有重复编号，请先检查备份");
-    return { version: 1, items };
+    return { version: 1, items: completeProductDetails(items) };
+  }
+  function completeProductDetails(items) {
+    return items.map((item) => {
+      const index = seedData.findIndex(([name]) => name === item.name);
+      if (
+        index < 0 ||
+        item.id !== `initial-purchase-20261025-${index + 1}` ||
+        !Object.hasOwn(productShelfLives, item.name) ||
+        item.productDetailsRevision === PRODUCT_DETAILS_REVISION
+      )
+        return item;
+      // Enrich only the original purchase, once, without replacing user details.
+      return {
+        ...item,
+        shelfLife: item.shelfLife || productShelfLives[item.name],
+        productDetailsRevision: PRODUCT_DETAILS_REVISION,
+      };
+    });
   }
   function mergeItems(current, incoming) {
     const merged = new Map(current.map((item) => [item.id, item]));
@@ -239,7 +272,7 @@
         merged.set(item.id, item);
     }
     if (merged.size > 5000) throw new Error("合并后超过5000项，请先整理记录");
-    return [...merged.values()];
+    return completeProductDetails([...merged.values()]);
   }
   function summarize(items, today = localDate()) {
     const active = items.filter((item) => item.status === "active");

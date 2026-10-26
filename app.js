@@ -79,6 +79,15 @@
         );
       }
     }
+    if (raw !== null && storageReadable && raw !== JSON.stringify(state)) {
+      try {
+        localStorage.setItem(P.STORAGE_KEY, JSON.stringify(state));
+      } catch (error) {
+        showStorageError(
+          "保质期信息尚未保存，请允许网站存储后重试。原有记录仍保留。",
+        );
+      }
+    }
   }
   function commit(items) {
     if (!storageReadable) {
@@ -184,6 +193,7 @@
     const info = P.deadlineInfo(item, today);
     const detailDates = [
       `购买 ${dateText(item.purchaseDate)}`,
+      item.shelfLife ? `保质期 ${escape(item.shelfLife)}` : "",
       item.openedDate ? `开封 ${dateText(item.openedDate)}` : "",
       item.expiryDate ? `包装到期 ${dateText(item.expiryDate)}` : "",
     ].filter(Boolean);
@@ -298,7 +308,9 @@
     });
     $("#deadline-preview").textContent =
       info.days === null
-        ? "尚未填写截止日，保存后标记为“待补日期”。"
+        ? field("shelfLife").value.trim()
+          ? `已记保质期 ${field("shelfLife").value.trim()}；还需包装上的具体到期日，才能开始倒计时。`
+          : "尚未填写截止日，保存后标记为“待补日期”。"
         : `${info.basis} ${dateText(info.date)} · ${info.days < 0 ? `已超${-info.days}天` : info.days === 0 ? "今天截止" : `剩余${info.days}天`}`;
   }
   async function confirmAction(title, description, actionLabel) {
@@ -339,6 +351,7 @@
         createdAt: existing?.createdAt || now,
         updatedAt: now,
         source: existing?.source || "手动登记",
+        productDetailsRevision: existing?.productDetailsRevision || "",
       });
       const next = existing
         ? state.items.map((value) => (value.id === item.id ? item : value))
